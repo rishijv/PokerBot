@@ -16,17 +16,19 @@ def get_text_via_copy_paste():
     """
     Clicks a button, simulates 'select all' and 'copy', then reads from the clipboard.
     """
-    button_x, button_y = 55, 590
+    log_x, log_y = 55, 590
+    closelog_x, closelog_y = 1035, 140
 
     print("Getting game text from hand history...")
-    pyautogui.click(button_x, button_y)
-    pyautogui.click(button_x, button_y)
-    time.sleep(0.5)
-
+    pyautogui.click(log_x, log_y)
+    pyautogui.click(log_x, log_y)
+    time.sleep(0.2)
     pyautogui.hotkey('command', 'a')
-    time.sleep(0.2)
+    time.sleep(0.05)
     pyautogui.hotkey('command', 'c')
-    time.sleep(0.2)
+    time.sleep(0.05)
+    pyautogui.click(closelog_x, closelog_y)
+    time.sleep(0.05)
 
     game_text = pyperclip.paste()
     return game_text
@@ -36,7 +38,7 @@ def get_openrouter_decision_from_text(game_text):
     Sends the copied game text to OpenRouter and asks for a decision.
     """
     prompt = f"""
-    You are a No Limit Texas Hold'em bot playing Game Theory Optimal (GTO).
+    You are a No Limit Texas Hold'em bot playing Game Theory Optimal (GTO). Don't be too scared to call during preflop action.
     Analyze the following hand history text. It is your turn to act.
 
     Hand History:
@@ -45,8 +47,8 @@ def get_openrouter_decision_from_text(game_text):
     ---
 
     Based on the text, what is the GTO move?
-    Respond with a single line: "FOLD", "CALL", "CHECK", or "RAISE <amount>".
-    Example: RAISE 2.50
+    Respond with a single line, no more: "FOLD", "CALL", "CHECK", or "RAISE <amount>".
+    Example: RAISE 1.00
     """
     
     print("🤖 Analyzing text with OpenRouter...")
@@ -58,7 +60,7 @@ def get_openrouter_decision_from_text(game_text):
                 "Content-Type": "application/json"
             },
             data=json.dumps({
-                "model": "nousresearch/nous-hermes-2-mistral-7b-dpo:free", # Using a free model
+                "model": "tngtech/deepseek-r1t-chimera:free", # Using a free model
                 "messages": [
                     {"role": "user", "content": prompt}
                 ]
