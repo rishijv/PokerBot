@@ -38,7 +38,7 @@ def get_openrouter_decision_from_text(game_text):
     Sends the copied game text to OpenRouter and asks for a decision.
     """
     prompt = f"""
-    You are a No Limit Texas Hold'em bot playing Game Theory Optimal (GTO). Don't be too scared to call during preflop action.
+    You are a No Limit Texas Hold'em bot playing Game Theory Optimal (GTO).
     Analyze the following hand history text. It is your turn to act.
 
     Hand History:
@@ -47,7 +47,7 @@ def get_openrouter_decision_from_text(game_text):
     ---
 
     Based on the text, what is the GTO move?
-    Respond with a single line, no more: "FOLD", "CALL", "CHECK", or "RAISE <amount>".
+    Respond with a single line: "FOLD", "CALL", "CHECK", or "RAISE <amount>".
     Example: RAISE 1.00
     """
     
@@ -71,7 +71,9 @@ def get_openrouter_decision_from_text(game_text):
         response_json = response.json()
         decision_text = response_json['choices'][0]['message']['content'].strip().upper()
         
-        print(f"✅ OpenRouter decided: {decision_text}")
+        # Only print the last line of the multi-line decision_text
+        last_line = decision_text.splitlines()[-1]
+        print(f"✅ OpenRouter decided: {last_line}")
         return decision_text
         
     except requests.exceptions.RequestException as e:
@@ -82,7 +84,7 @@ def get_openrouter_decision_from_text(game_text):
 if __name__ == "__main__":
     game_text = get_text_via_copy_paste()
 
-    if game_text and len(game_text) > 20:
+    if game_text and len(game_text) > 5:
         print("--- Copied Text ---")
         print(game_text)
         print("--------------------")
