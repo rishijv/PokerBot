@@ -1,63 +1,92 @@
 import os
 import pyautogui
-from PIL import Image # Pillow is used to handle the image data
-import google.generativeai as genai # Import the new Google library
+import time
+import pyperclip
+import requests  # New import for making API requests
+import json      # New import for handling JSON data
 
-# --- Configure the Gemini client ---
-# It will automatically find the GOOGLE_API_KEY from your environment
+# --- Get the OpenRouter API Key ---
 try:
-    genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+    API_KEY = os.environ["OPENROUTER_API_KEY"]
 except KeyError:
-    print("❌ GOOGLE_API_KEY not found. Please set the environment variable.")
+    print("❌ OPENROUTER_API_KEY not found. Please set the environment variable.")
     exit()
 
+def get_text_via_copy_paste():
+    """
+    Clicks a button, simulates 'select all' and 'copy', then reads from the clipboard.
+    """
+    button_x, button_y = 55, 590
 
-def capture_game_image(region):
-    """
-    Captures a region of the screen and returns it as an Image object.
-    """
-    screenshot = pyautogui.screenshot(region=region)
-    return screenshot
+    print("Getting game text from hand history...")
+    pyautogui.click(button_x, button_y)
+    pyautogui.click(button_x, button_y)
+    time.sleep(0.5)
 
-def get_gemini_decision_from_image(image):
+    pyautogui.hotkey('command', 'a')
+    time.sleep(0.2)
+    pyautogui.hotkey('command', 'c')
+    time.sleep(0.2)
+
+    game_text = pyperclip.paste()
+    return game_text
+
+def get_openrouter_decision_from_text(game_text):
     """
-    Sends an image of the game state to Gemini Pro Vision and asks for a decision.
+    Sends the copied game text to OpenRouter and asks for a decision.
     """
-    # Use the model that can handle image inputs
-    vision_model = genai.GenerativeModel('gemini-1.5-flash-latest')
+    prompt = f"""
+    You are a No Limit Texas Hold'em bot playing Game Theory Optimal (GTO).
+    Analyze the following hand history text. It is your turn to act.
+
+    Hand History:
+    ---
+    {game_text}
+    ---
+
+    Based on the text, what is the GTO move?
+    Respond with a single line: "FOLD", "CALL", "CHECK", or "RAISE <amount>".
+    Example: RAISE 2.50
+    """
     
-    prompt = """
-    You are a No Limit Texas Hold'em bot playing Game Theory Optimal (GTO). GTO means making mathematically balanced decisions—bet sizes, frequencies, and hand ranges—so opponents cannot exploit you. Mix bluffs and value bets in correct ratios, defend vs. aggression, and adjust only if others deviate from optimal. Be risk-averse; avoid big risks.
+    print("🤖 Analyzing text with OpenRouter...")
+    try:
+        response = requests.post(
+            url="https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json"
+            },
+            data=json.dumps({
+                "model": "nousresearch/nous-hermes-2-mistral-7b-dpo:free", # Using a free model
+                "messages": [
+                    {"role": "user", "content": prompt}
+                ]
+            })
+        )
+        response.raise_for_status() # Will raise an error for bad status codes (4xx or 5xx)
 
-    In No Limit Hold'em, raises must be ≥ previous raise. If the frame is highlighted, it’s your turn. Use the pot size (above board cards), your hand, and bets from other players (numbers on table rim) to choose the +EV move.
-    Respond with "FOLD", "CALL", "CHECK", or "RAISE". If raising, give an exact amount (e.g., "1.25") Understand that there is a minimum raise in No Limit Hold'em. Always play to maximize expected value.
-    """
-#Is it my turn to act? Respond with "YES" or "NO".
-#   2.
-    print("🤖 Analyzing image with Gemini...")
-    
-    # Generate content from the prompt and the image
-    response = vision_model.generate_content([prompt, image])
+        response_json = response.json()
+        decision_text = response_json['choices'][0]['message']['content'].strip().upper()
+        
+        print(f"✅ OpenRouter decided: {decision_text}")
+        return decision_text
+        
+    except requests.exceptions.RequestException as e:
+        print(f"❌ An API error occurred: {e}")
+        return None
 
-    decision = response.text.strip().upper()
-    print(f"✅ Gemini decided: {decision}")
-    return decision
-
-
+# --- Main Part of the Script ---
 if __name__ == "__main__":
-    # Define the area of your screen where the poker game is
-    game_area = (5, 120, 980, 450)
+    game_text = get_text_via_copy_paste()
 
-    # 1. Capture the game screen
-    game_image = capture_game_image(region=game_area)
+    if game_text and len(game_text) > 20:
+        print("--- Copied Text ---")
+        print(game_text)
+        print("--------------------")
 
-    if game_image:
-        # 2. Get a decision directly from the image using Gemini
-        decision = get_gemini_decision_from_image(game_image)
-        # 3. Execute the decision
-        # Example:
-        # if "RAISE" in decision:
-        #     pyautogui.write("150") # Types the bet amount
-        #     pyautogui.press("enter")
-        # elif "CALL" in decision:
-        #     ...
+        decision = get_openrouter_decision_from_text(game_text)
+        
+        # execute_action(decision)
+    else:
+        print("❌ Failed to copy any significant text from the page.")
